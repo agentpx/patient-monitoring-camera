@@ -17,15 +17,16 @@
 #include "camera_pins.h"
 
 const byte DNS_PORT = 53;
-IPAddress apIP(172, 217, 28, 1);
+IPAddress apIP(192, 168, 1, 1);
 DNSServer dnsServer;
 WiFiServer server(80);
 
 String responseHTML = ""
-  "<!DOCTYPE html><html><head><title>CaptivePortal</title></head><body>"
-  "<meta http-equiv=\"refresh\" content=\"1;url=http://172.217.28.1:81/stream\"/>"
-  "<h1>Please Wait!</h1><p>You will be redirected to the camera stream "
-  "shortly.</p></body></html>";
+                      "<!DOCTYPE html><html><head><title>CaptivePortal</title></head><body>"
+                      "<h1>Patient Monitoring Camera 2020</h1><br>#lockdownlab<br><br>"
+                      "<img width=\"100%\" src=\"http://192.168.1.1:81/stream\"/><br>"
+                      "<p>You may also access this in your browser: http://192.168.1.1</p>"
+                      "</body></html>";
 void startCameraServer();
 
 void setup() {
@@ -55,7 +56,7 @@ void setup() {
   config.xclk_freq_hz = 20000000;
   config.pixel_format = PIXFORMAT_JPEG;
   //init with high specs to pre-allocate larger buffers
-  if(psramFound()){
+  if (psramFound()) {
     config.frame_size = FRAMESIZE_UXGA;
     config.jpeg_quality = 10;
     config.fb_count = 2;
@@ -66,7 +67,7 @@ void setup() {
   }
 
   // camera init
-  
+
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
     Serial.printf("Camera init failed with error 0x%x", err);
@@ -81,12 +82,12 @@ void setup() {
   delay(100);
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 0, 0));
   WiFi.softAP("Patient Monitoring Camera");
-  
+
   // if DNSServer is started with "*" for domain name, it will reply with
   // provided IP to all DNS request
   dnsServer.start(DNS_PORT, "*", apIP);
 
-server.begin();
+  server.begin();
 
 
   startCameraServer();
@@ -117,6 +118,6 @@ void loop() {
         }
       }
     }
-   // client.stop();  
-  }   
+    // client.stop();
+  }
 }
