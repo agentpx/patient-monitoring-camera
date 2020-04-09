@@ -21,6 +21,7 @@ IPAddress apIP(192, 168, 1, 1);
 DNSServer dnsServer;
 WiFiServer server(80);
 
+
 String responseHTML = ""
 "<!DOCTYPE html>"
 "<html>"
@@ -86,7 +87,7 @@ String responseHTML = ""
 "    document.getElementById('cam-title').innerHTML = newTitle;"
 "    "
 "    const Http = new XMLHttpRequest();"
-"    const url='update_title/'+newTitle;"
+"    const url='http://192.168.1.1:81/update?var=title&val='+newTitle+'&ts='+Date.now();"
 "    Http.open('GET', url);"
 "    Http.send();"
 "  }"

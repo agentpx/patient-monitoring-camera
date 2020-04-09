@@ -22,6 +22,9 @@
 #include "fd_forward.h"
 #include "fr_forward.h"
 
+
+#include <EEPROM.h>
+
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
 
@@ -62,6 +65,37 @@ static int8_t recognition_enabled = 0;
 static int8_t is_enrolling = 0;
 static face_id_list id_list = {0};
 
+
+void writeEpromString(char add,String data)
+{
+  int _size = data.length();
+  int i;
+  for(i=0;i<_size;i++)
+  {
+    EEPROM.write(add+i,data[i]);
+  }
+  EEPROM.write(add+_size,'\0');   //Add termination null character for String Data
+  EEPROM.commit();
+}
+ 
+ 
+String readEpromString(char add)
+{
+  int i;
+  char data[100]; //Max 100 Bytes
+  int len=0;
+  unsigned char k;
+  k=EEPROM.read(add);
+  while(k != '\0' && len<500)   //Read until null character
+  {    
+    k=EEPROM.read(add+len);
+    data[len]=k;
+    len++;
+  }
+  data[len]='\0';
+  return String(data);
+}
+ 
 static ra_filter_t * ra_filter_init(ra_filter_t * filter, size_t sample_size){
     memset(filter, 0, sizeof(ra_filter_t));
 
@@ -215,10 +249,53 @@ static size_t jpg_encode_stream(void * arg, size_t index, const void* data, size
     return len;
 }
 
-static esp_err_t update_title_handler(httpd_req_t *req){
-  
+static esp_err_t update_handler(httpd_req_t *req) {
     Serial.println("updating title.............");
     esp_err_t res = ESP_OK;
+    
+
+    char*  buf;
+    size_t buf_len;
+    char variable[32] = {0,};
+    char value[32] = {0,};
+
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1) {
+        buf = (char*)malloc(buf_len);
+        if(!buf){
+            httpd_resp_send_500(req);
+            return ESP_FAIL;
+        }
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+            if (httpd_query_key_value(buf, "var", variable, sizeof(variable)) == ESP_OK &&
+                httpd_query_key_value(buf, "val", value, sizeof(value)) == ESP_OK) {
+            } else {
+                free(buf);
+                httpd_resp_send_404(req);
+                return ESP_FAIL;
+            }
+        } else {
+            free(buf);
+            httpd_resp_send_404(req);
+            return ESP_FAIL;
+        }
+        free(buf);
+    } else {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+   
+
+    if(!strcmp(variable, "title")) {
+        Serial.println("updating title...");
+        Serial.println(value);
+
+        String retrievedString = readEpromString(0);
+        Serial.print("The String we read from EEPROM: ");
+        Serial.println(retrievedString);
+
+        writeEpromString(0, value);
+    }
     return res;
 }
 
@@ -511,6 +588,8 @@ static esp_err_t index_handler(httpd_req_t *req){
 }
 
 void startCameraServer(){
+  
+    EEPROM.begin(512);
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     httpd_uri_t index_uri = {
@@ -534,17 +613,10 @@ void startCameraServer(){
         .user_ctx  = NULL
     };
 
-    httpd_uri_t capture_uri = {
-        .uri       = "/capture",
+    httpd_uri_t update_uri = {
+        .uri       = "/update",
         .method    = HTTP_GET,
-        .handler   = capture_handler,
-        .user_ctx  = NULL
-    };
-
-    httpd_uri_t update_title_uri = {
-        .uri       = "/update_title",
-        .method    = HTTP_GET,
-        .handler   = update_title_handler,
+        .handler   = update_handler,
         .user_ctx  = NULL
     };
 
@@ -572,16 +644,13 @@ void startCameraServer(){
     mtmn_config.o_threshold.nms = 0.7;
     mtmn_config.o_threshold.candidate_number = 1;
     
-    face_id_init(&id_list, FACE_ID_SAVE_NUMBER, ENROLL_CONFIRM_TIMES);
-    
     config.server_port = 81;
     Serial.printf("Starting web server on port: '%d'\n", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK) {
         httpd_register_uri_handler(camera_httpd, &index_uri);
         httpd_register_uri_handler(camera_httpd, &cmd_uri);
         httpd_register_uri_handler(camera_httpd, &status_uri);
-        httpd_register_uri_handler(camera_httpd, &capture_uri);
-        httpd_register_uri_handler(camera_httpd, &update_title_uri);
+        httpd_register_uri_handler(camera_httpd, &update_uri);
     }
 
     config.server_port = 82;
