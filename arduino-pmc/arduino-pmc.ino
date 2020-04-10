@@ -1,6 +1,7 @@
-#include "esp_camera.h"
+#include "esp_camera.h" 
 #include <WiFi.h>
 #include <DNSServer.h>
+#include <EEPROM.h>
 
 //
 // WARNING!!! Make sure that you have either selected ESP32 Wrover Module,
@@ -21,80 +22,42 @@ IPAddress apIP(192, 168, 1, 1);
 DNSServer dnsServer;
 WiFiServer server(80);
 
+String getPortalResponse() {
+  String responseHTML = ""
+  "<!DOCTYPE html><html><head><title>Patient Monitoring</title>"
+  "<style>  body {width: 100%; overflow-x: hidden;font-family: Arial;  }  button, input {    font-size: 18pt;  }    #cam-title {    font-size: 20pt;  }  #cam-title input {    border-style: dotted;    border-width: 0;    width: 100%;  }    #title-edit {    display: none;  }</style>"
+  "</head><body>"
+  "<div style='text-align: center;'>  <h1 style='display: inline;'>Patient Monitoring Camera 2020</h1>  <h5 style='display: inline;'>by #lockdownlab</h5>  <p style='margin:0; font-size: 12pt;'>Open in browser: http://192.168.1.1</p>  </div>  <br>  "
+  "<div id='title-display'><div style='float: left; padding: 5px;'><div>Camera Name:</div></div>    <div style='float: right;'><button onClick='onClickEdit();'>edit</button></div>    <div id='cam-title' style='border-style: solid; overflow: hidden;'>Room Name</div>  </div>"
+  "<div id='title-edit'><div style='float: left; padding: 5px;'><div>Camera Name:</div></div>    <div style='float: right;'><button onClick='onClickSave();'>save</button></div>    <div id='cam-title' style='border-style: dotted; overflow: hidden;'><input id='title-input' type='text' value=''></div>  </div>"
+  "<div style='width: 100%;'>    <img style='width:130%; transform: rotate(90deg) translateX(15%) translateY(16%);'  src='http://192.168.1.1:82/stream'/>  </div>"
+  "<script>"
+  "document.getElementById('cam-title').innerHTML = unescape('" + mainFetchString(0) + "');"
+  "function onClickEdit() {    document.getElementById('title-display').style.display = 'none';    document.getElementById('title-edit').style.display = 'block';    var oldTitle = document.getElementById('cam-title').innerHTML;    document.getElementById('title-input').value = oldTitle;  }"
+  "function onClickSave() {    document.getElementById('title-edit').style.display = 'none';    document.getElementById('title-display').style.display = 'block';    var newTitle = document.getElementById('title-input').value;    document.getElementById('cam-title').innerHTML = newTitle;        const Http = new XMLHttpRequest();    const url='http://192.168.1.1:81/update?var=title&val='+newTitle+'&ts='+Date.now();    Http.open('GET', url);    Http.send();  }"
+  "</script></body></html>";
+  return responseHTML;  
+}
 
-String responseHTML = ""
-"<!DOCTYPE html>"
-"<html>"
-"<head>"
-"<title>Patient Monitoring</title>"
-"<style>"
-"  body {"
-"    width: 100%;"
-"    font-family: Arial;"
-"  }"
-"  button, input {"
-"    font-size: 18px;"
-"  }"
-"  "
-"  #cam-title {"
-"    font-size: 20px;"
-"  }"
-"  #cam-title input {"
-"    border-style: dotted;"
-"    border-width: 0;"
-"    width: 100%;"
-"  }"
-"  "
-"  #title-edit {"
-"    display: none;"
-"  }"
-"</style>"
-"</head>"
-"<body>"
-"  <div style='text-align: center;'>"
-"  <h1 style='display: inline;'>Patient Monitoring Camera 2020</h1>"
-"  <h5 style='display: inline;'>by #lockdownlab</h5>"
-"  <p style='margin:0; font-size: 12px;'>Open in browser: http://192.168.1.1</p>"
-"  </div>"
-"  <br>"
-"  <div id='title-display'>"
-"    <div style='float: left; padding: 5px;'><div>Camera Name:</div></div>"
-"    <div style='float: right;'><button onClick='onClickEdit();'>edit</button></div>"
-"    <div id='cam-title' style='border-style: solid; overflow: hidden;'>Room X</div>"
-"  </div>"
-"  <div id='title-edit'>"
-"    <div style='float: left; padding: 5px;'><div>Camera Name:</div></div>"
-"    <div style='float: right;'><button onClick='onClickSave();'>save</button></div>"
-"    <div id='cam-title' style='border-style: dotted; overflow: hidden;'><input id='title-input' type='text' value=''></div>"
-"  </div>"
-"  <div>"
-"    <img width='100%' src='http://192.168.1.1:82/stream'/>"
-"  </div>"
-"  "
-"  "
-"  <script>"
-"  function onClickEdit() {"
-"    document.getElementById('title-display').style.display = 'none';"
-"    document.getElementById('title-edit').style.display = 'block';"
-"    var oldTitle = document.getElementById('cam-title').innerHTML;"
-"    document.getElementById('title-input').value = oldTitle;"
-"  }"
-"  "
-"  function onClickSave() {"
-"    document.getElementById('title-edit').style.display = 'none';"
-"    document.getElementById('title-display').style.display = 'block';"
-"    var newTitle = document.getElementById('title-input').value;"
-"    document.getElementById('cam-title').innerHTML = newTitle;"
-"    "
-"    const Http = new XMLHttpRequest();"
-"    const url='http://192.168.1.1:81/update?var=title&val='+newTitle+'&ts='+Date.now();"
-"    Http.open('GET', url);"
-"    Http.send();"
-"  }"
-"  </script>"
-"</body>"
-"</html>";
 void startCameraServer();
+
+
+String mainFetchString(char add)
+{
+  int i;
+  char data[100]; //Max 100 Bytes
+  int len=0;
+  unsigned char k;
+  k=EEPROM.read(add);
+  while(k != '\0' && len<500)   //Read until null character
+  {    
+    k=EEPROM.read(add+len);
+    data[len]=k;
+    len++;
+  }
+  data[len]='\0';
+  return String(data);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -159,7 +122,15 @@ void setup() {
 
   startCameraServer();
 
+  EEPROM.begin(512);
+
+
+
+  String retrievedString = mainFetchString(0);
+  Serial.print("The String we read from EEPROM: ");
+  Serial.println(retrievedString);
 }
+
 
 void loop() {
   dnsServer.processNextRequest();
@@ -175,7 +146,8 @@ void loop() {
             client.println("HTTP/1.1 200 OK");
             client.println("Content-type:text/html");
             client.println();
-            client.print(responseHTML);
+            client.print(getPortalResponse());
+
             break;
           } else {
             currentLine = "";

@@ -21,9 +21,8 @@
 #include "fb_gfx.h"
 #include "fd_forward.h"
 #include "fr_forward.h"
-
-
 #include <EEPROM.h>
+
 
 #define ENROLL_CONFIRM_TIMES 5
 #define FACE_ID_SAVE_NUMBER 7
@@ -65,8 +64,7 @@ static int8_t recognition_enabled = 0;
 static int8_t is_enrolling = 0;
 static face_id_list id_list = {0};
 
-
-void writeEpromString(char add,String data)
+void storeString(char add,String data)
 {
   int _size = data.length();
   int i;
@@ -79,7 +77,7 @@ void writeEpromString(char add,String data)
 }
  
  
-String readEpromString(char add)
+String fetchString(char add)
 {
   int i;
   char data[100]; //Max 100 Bytes
@@ -290,11 +288,11 @@ static esp_err_t update_handler(httpd_req_t *req) {
         Serial.println("updating title...");
         Serial.println(value);
 
-        String retrievedString = readEpromString(0);
+        String retrievedString = fetchString(0);
         Serial.print("The String we read from EEPROM: ");
         Serial.println(retrievedString);
 
-        writeEpromString(0, value);
+        storeString(0, value);
     }
     return res;
 }
@@ -588,8 +586,6 @@ static esp_err_t index_handler(httpd_req_t *req){
 }
 
 void startCameraServer(){
-  
-    EEPROM.begin(512);
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     httpd_uri_t index_uri = {
