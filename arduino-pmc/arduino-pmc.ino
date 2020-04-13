@@ -25,16 +25,53 @@ WiFiServer server(80);
 String getPortalResponse() {
   String responseHTML = ""
   "<!DOCTYPE html><html><head><title>Patient Monitoring</title>"
-  "<style>  body {width: 100%; overflow-x: hidden;font-family: Arial;  }  button, input {    font-size: 18pt;  }    #cam-title {    font-size: 20pt;  }  #cam-title input {    border-style: dotted;    border-width: 0;    width: 100%;  }    #title-edit {    display: none;  }</style>"
+  "<style>  body {width: 100%; overflow-x: hidden;font-family: Arial;  }  button, input {    font-size: 18pt;  } .button { background-color: #4CAF50; border: none; color: white; padding: 15px 32px; text-align: center; text-decoration: none; display: inline-block; font-size: 16px; margin: 4px 2px; cursor: pointer; }  #cam-title {    font-size: 20pt;  }  #cam-title input {    border-style: dotted;    border-width: 0;    width: 100%;  }    #title-edit {    display: none;  }</style>"
   "</head><body>"
-  "<div style='text-align: center;'>  <h1 style='display: inline;'>Patient Monitoring Camera 2020</h1>  <h5 style='display: inline;'>by #lockdownlab</h5>  <p style='margin:0; font-size: 12pt;'>Open in browser: http://192.168.1.1</p>  </div>  <br>  "
-  "<div id='title-display'><div style='float: left; padding: 5px;'><div>Camera Name:</div></div>    <div style='float: right;'><button onClick='onClickEdit();'>edit</button></div>    <div id='cam-title' style='border-style: solid; overflow: hidden;'>Room Name</div>  </div>"
-  "<div id='title-edit'><div style='float: left; padding: 5px;'><div>Camera Name:</div></div>    <div style='float: right;'><button onClick='onClickSave();'>save</button></div>    <div id='cam-title' style='border-style: dotted; overflow: hidden;'><input id='title-input' type='text' value=''></div>  </div>"
-  "<div style='width: 100%;'>    <img style='width:130%; transform: rotate(90deg) translateX(15%) translateY(16%);'  src='http://192.168.1.1:82/stream'/>  </div>"
+  // "<div style='text-align: center;'>  <h1 style='display: inline;'>Patient Monitoring Camera 2020</h1>  <h5 style='display: inline;'>by #lockdownlab</h5>  <p style='margin:0; font-size: 12pt;'>Open in browser: http://192.168.1.1</p>  </div>  <br>  "
+  // "<div id='title-display'><div style='float: left; padding: 5px;'><div>Camera Name:</div></div>    <div style='float: right;'><button onClick='onClickEdit();'>edit</button></div>    <div id='cam-title' style='border-style: solid; overflow: hidden;'>Room Name</div>  </div>"
+  // "<div id='title-edit'><div style='float: left; padding: 5px;'><div>Camera Name:</div></div>    <div style='float: right;'><button onClick='onClickSave();'>save</button></div>    <div id='cam-title' style='border-style: dotted; overflow: hidden;'><input id='title-input' type='text' value=''></div>  </div>"
+  "<div id='video-stream'> <img src='http://192.168.1.1:82/stream'/ width='100%'>  </div>"
+  "<br><br>"
+  "<div id='fullscreen-message'><span style='font-size: 32px;'>For optimal full-screen view, please open-up your bowser and visit: <strong>http://192.168.1.1/fullscreen<strong></span></div>"
   "<script>"
-  "document.getElementById('cam-title').innerHTML = unescape('" + mainFetchString(0) + "');"
+  // "document.getElementById('cam-title').innerHTML = unescape('" + mainFetchString(0) + "');"
   "function onClickEdit() {    document.getElementById('title-display').style.display = 'none';    document.getElementById('title-edit').style.display = 'block';    var oldTitle = document.getElementById('cam-title').innerHTML;    document.getElementById('title-input').value = oldTitle;  }"
   "function onClickSave() {    document.getElementById('title-edit').style.display = 'none';    document.getElementById('title-display').style.display = 'block';    var newTitle = document.getElementById('title-input').value;    document.getElementById('cam-title').innerHTML = newTitle;        const Http = new XMLHttpRequest();    const url='http://192.168.1.1:81/update?var=title&val='+newTitle+'&ts='+Date.now();    Http.open('GET', url);    Http.send();  }"
+  "var elem = document.getElementById('video-stream');"
+  "function openFullscreen() {"
+  "  if (elem.requestFullscreen) {"
+  "    elem.requestFullscreen();"
+  "  } else if (elem.mozRequestFullScreen) { /* Firefox */"
+  "    elem.mozRequestFullScreen();"
+  "  } else if (elem.webkitRequestFullscreen) { /* Chrome, Safari & Opera */"
+  "    elem.webkitRequestFullscreen();"
+  "  } else if (elem.msRequestFullscreen) { /* IE/Edge */"
+  "    elem.msRequestFullscreen();"
+  "  }"
+  "}"
+  "function getPathName() { if(window.location.pathname=='/fullscreen') { document.getElementById('fullscreen-message').innerHTML = '<button onclick=\"openFullscreen();\">SWITCH TO FULL SCREEN VIEW</button>'; document.getElementById('fullscreen-message').style.textAlign = 'center'; document.getElementById('fullscreen-message').style.fontSize = 'xx-large'; } }"
+  "getPathName();"
+  "function getMobileOperatingSystem() {"
+  "  var userAgent = navigator.userAgent || navigator.vendor || window.opera;"
+  ""
+  "  if (/windows phone/i.test(userAgent)) {"
+  "      return \"Windows Phone\";"
+  "  }"
+  ""
+  "  if (/android/i.test(userAgent)) {"
+  "      return \"Android\";"
+  "  }"
+  ""
+  "  if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {"
+  "      return \"iOS\";"
+  "  }"
+  ""
+  "  return \"unknown\";"
+  "}"
+  "if(getMobileOperatingSystem()=='iOS') {"
+  "  window.location.replace('http://192.168.1.1:82/stream');"
+  "}"
+
   "</script></body></html>";
   return responseHTML;  
 }
@@ -44,19 +81,20 @@ void startCameraServer();
 
 String mainFetchString(char add)
 {
-  int i;
-  char data[100]; //Max 100 Bytes
-  int len=0;
-  unsigned char k;
-  k=EEPROM.read(add);
-  while(k != '\0' && len<500)   //Read until null character
-  {    
-    k=EEPROM.read(add+len);
-    data[len]=k;
-    len++;
-  }
-  data[len]='\0';
-  return String(data);
+  // int i;
+  // char data[100]; //Max 100 Bytes
+  // int len=0;
+  // unsigned char k;
+  // k=EEPROM.read(add);
+  // while(k != '\0' && len<500)   //Read until null character
+  // {    
+  //   k=EEPROM.read(add+len);
+  //   data[len]=k;
+  //   len++;
+  // }
+  // data[len]='\0';
+  // return String(data);
+  return "Patient Monitoring Camera";
 }
 
 void setup() {
